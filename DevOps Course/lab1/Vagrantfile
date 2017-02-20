@@ -1,0 +1,117 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+    config.vm.define :haproxy_0 do |haproxy_0_config|
+      haproxy_0_config.vm.box = "debian/jessie64"
+      haproxy_0_config.vm.network "forwarded_port", guest:80, host:81
+      haproxy_0_config.vm.network "forwarded_port", guest:9000, host:9000
+      haproxy_0_config.vm.network "private_network", ip: "10.0.0.10" 
+      haproxy_0_config.vm.provider "virtualbox" do |vbox|
+        vbox.memory = 512
+        vbox.cpus = 1
+      end
+      haproxy_0_config.vm.hostname = "haproxy-0.mylab.int"
+      haproxy_0_config.vm.provision "shell", inline: <<-SHELL
+      echo deb http://httpredir.debian.org/debian jessie-backports main | sed 's/\(.*\)-sloppy \(.*\)/&@\1 \2/' | tr @ '\n' | tee /etc/apt/sources.list.d/backports.list
+      apt-get update
+      apt-get install -y haproxy -t jessie-backports
+      mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+      cp /vagrant/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg
+      systemctl reload haproxy
+      apt-get install -y keepalived
+      cp /vagrant/keepalived/keepalived-master.conf /etc/keepalived/keepalived.conf
+      systemctl restart keepalived
+      apt-get install psmisc
+      SHELL
+      #hostnamectl set-hostname haproxy_0.mylab.int
+    end
+    config.vm.define :haproxy_1 do |haproxy_1_config|
+      haproxy_1_config.vm.box = "debian/jessie64"
+      haproxy_1_config.vm.network "forwarded_port", guest:80, host:82
+      haproxy_1_config.vm.network "forwarded_port", guest:9000, host:9001
+      haproxy_1_config.vm.network "private_network", ip: "10.0.0.11"
+      haproxy_1_config.vm.provider "virtualbox" do |vbox|
+        vbox.memory = 512
+        vbox.cpus = 1
+      end
+      haproxy_1_config.vm.hostname = "haproxy-1.mylab.int"
+      haproxy_1_config.vm.provision "shell", inline: <<-SHELL
+        echo deb http://httpredir.debian.org/debian jessie-backports main | sed 's/\(.*\)-sloppy \(.*\)/&@\1 \2/' | tr @ '\n' | tee /etc/apt/sources.list.d/backports.list
+        apt-get update
+        apt-get install -y haproxy -t jessie-backports
+        mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+        cp /vagrant/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg
+        systemctl reload haproxy
+        apt-get install -y keepalived 
+        cp /vagrant/keepalived/keepalived-slave.conf /etc/keepalived/keepalived.conf
+        systemctl restart keepalived
+        apt-get install psmisc
+        SHELL
+        #hostnamectl set-hostname haproxy_1.mylab.int
+    end
+    config.vm.define :apache_0 do |apache_0_config|
+      apache_0_config.vm.box = "debian/jessie64"
+      apache_0_config.vm.network "forwarded_port", guest:80, host:8050
+      apache_0_config.vm.network "private_network", ip: "10.0.0.12"
+      apache_0_config.vm.provider "virtualbox" do |vbox|
+        vbox.memory = 512
+        vbox.cpus = 1
+      end
+      apache_0_config.vm.hostname = "apache-0.mylab.int"
+      apache_0_config.vm.provision "shell", inline: <<-SHELL
+        apt-get update
+        apt-get install -y apache2 apache2-doc
+        apt-get install -y php5-common libapache2-mod-php5 php5-mysql php5-cli
+        cp /vagrant/apache/dir.conf /etc/apache2/mods-enabled/dir.conf
+        chmod +x /vagrant/apache/joomla_install.sh
+        /vagrant/apache/joomla_install.sh
+        mv /etc/apache2/sites-available/000-default.conf /etc/apache2/sites-available/000-default.conf.bak
+        cp /vagrant/apache/000-default.conf /etc/apache2/sites-available/000-default.conf
+        systemctl restart apache2
+        SHELL
+      end
+    config.vm.define :apache_1 do |apache_1_config|
+      apache_1_config.vm.box = "debian/jessie64"
+      apache_1_config.vm.network "forwarded_port", guest:80, host:8051
+      apache_1_config.vm.network "private_network", ip: "10.0.0.13"
+      apache_1_config.vm.provider "virtualbox" do |vbox|
+        vbox.memory = 512
+        vbox.cpus = 1
+      end
+      apache_1_config.vm.hostname = "apache-1.mylab.int"
+      apache_1_config.vm.provision "shell", inline: <<-SHELL
+        apt-get update
+        apt-get install -y apache2 apache2-doc
+        apt-get install -y php5-common libapache2-mod-php5 php5-mysql php5-cli
+        cp /vagrant/apache/dir.conf /etc/apache2/mods-enabled/dir.conf
+        chmod +x /vagrant/apache/joomla_install.sh
+        /vagrant/apache/joomla_install.sh
+        mv /etc/apache2/sites-available/000-default.conf /etc/apache2/sites-available/000-default.conf.bak
+        cp /vagrant/apache/000-default.conf /etc/apache2/sites-available/000-default.conf
+        systemctl restart apache2
+        SHELL
+      end
+    config.vm.define :datebase_0 do |datebase_0_config|
+      datebase_0_config.vm.box = "debian/jessie64"
+      datebase_0_config.vm.network "forwarded_port", guest:3306, host:13306
+      datebase_0_config.vm.network "private_network", ip: "10.0.0.14"
+      datebase_0_config.vm.provider "virtualbox" do |vbox|
+        vbox.memory = 512
+        vbox.cpus = 1
+      end
+      datebase_0_config.vm.hostname = "datebase-0.mylab.int"
+      datebase_0_config.vm.provision "shell", inline: <<-SHELL
+        chmod +x /vagrant/db/mysql_params.sh
+        /vagrant/db/mysql_params.sh
+        apt-get update
+        apt-get install -y mysql-server php5-mysql
+        sed -i 's/127\.0\.0\.1/10\.0\.0\.14/g' /etc/mysql/my.cnf
+        chmod +x /vagrant/db/mysql_secure.sh
+        /vagrant/db/mysql_secure.sh      
+        systemctl restart mysql  
+        chmod +x /vagrant/db/mysql_joomla_setting.sh
+        /vagrant/db/mysql_joomla_setting.sh
+        SHELL
+      end
+    end
